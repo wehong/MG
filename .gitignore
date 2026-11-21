@@ -1,0 +1,8 @@
+__pycache__/
+test/diskA/
+test/diskB/
+dist/
+patch/
+*.sym
+shots/preview/
+build/
