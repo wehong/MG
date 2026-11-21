@@ -1,6 +1,6 @@
 ; ==========================================================================
 ;  MG.COM 1.5  -  MSX-DOS2 File Browser & Launcher, SCREEN 2 (graphic) version
-;               (same functions as MB.COM, drawn as a 256 x 192 bitmap)
+;               (drawn as a 256 x 192 bitmap)
 ; --------------------------------------------------------------------------
 ;  * Lists directories / files of the current directory (dirs first, sorted)
 ;  * UP/DOWN    : move selection        LEFT/RIGHT : page up / page down
@@ -21,7 +21,7 @@
 ;  * D          : change drive
 ;  Memory       : TPA top (0006h) C6F0h or higher, extraction CE00h
 ;  * F1         : box with the version
-;  * ESC        : quit (restore the directory MB was started in)
+;  * ESC        : quit (restore the directory MG was started in)
 ;  * Q          : quit and stay in the current directory
 ;
 ;  Config file  : MG.CFG next to MG.COM (located via the PROGRAM env item)
@@ -31,7 +31,7 @@
 ;      DSKARG=%F                    (its arguments, same % codes as ROMARG)
 ;      EDITOR=A:\TOOLS\TED.COM      (optional: other editor for .TXT / .CFG)
 ;      EDITARG=%F                   (its arguments, same % codes as ROMARG)
-;      TMPDIR=H:\              (optional, default: the directory of MB.CFG)
+;      TMPDIR=H:\              (optional, default: the directory of MG.CFG)
 ;      STARTDIR=A:\GAMES        (optional, directory to start browsing in)
 ;    ROMARG template: %F = full path of the ROM, %N = file name only, %% = %
 ;
@@ -278,7 +278,7 @@ k_about:
         ld bc,str_desc
         call dlg_msg
         call getkey             ; any key closes it (and is not used further)
-        call drawlist
+        call dlg_close
         jp mainloop
 
 ; ---- back from a program run by MGRUNn.BAT -------------------------------------------
@@ -374,6 +374,7 @@ HLP_Y1:     equ HLP_Y0+20+HLP_N*10+3
 k_help:
         call f1down             ; wait until F1 is released
         jr z,k_help
+        call titoff
         ld a,HLP_Y0>>3
 khl_b:  push af
         call hlp_band
@@ -487,7 +488,7 @@ kbt_k:  call getkey
         jp z,run_txt
         cp KEY_ESC
         jr nz,kbt_k
-        call drawlist
+        call dlg_close
         jp mainloop
 
 ; ---- DEL / F2: delete / rename the selection (in the overlay, see mged.asm) ------------------
@@ -539,7 +540,8 @@ kdr_zip:pop hl
         ld hl,msg_inzip
         jp status_loop
 
-; Z if HL is MB.COM or MG.COM (these are not run from here)
+; Z if HL is MG.COM (or MB.COM, the text mode version): not run from here,
+; as their own MGRUNn / MBRUNn.BAT would mix with the one that runs them
 isself: push hl
         ld de,str_mbcom
         call strcmpi
@@ -1162,8 +1164,8 @@ pd_e:   pop hl
 pd_cut: ld (hl),0
         ret
 
-; STARTDIR from MB.CFG: start browsing there (ESC still returns to the
-; directory MB was started in)
+; STARTDIR from MG.CFG: start browsing there (ESC still returns to the
+; directory MG was started in)
 gostart:
         ld a,(startcfg)
         or a
@@ -1192,7 +1194,7 @@ gs_bad: ld a,(origdrv)          ; not found: stay where we are
         ld (pendmsg),hl
         ret
 
-; tmpdir = TMPDIR from MB.CFG, or the directory of MB.CFG
+; tmpdir = TMPDIR from MG.CFG, or the directory of MG.CFG
 settmp:
         ld hl,tmpcfg
         ld a,(hl)
@@ -3746,7 +3748,7 @@ fc_fallback:
         ld de,cfgpath
         jp strcpy
 
-; read MB.CFG (missing file is fine)
+; read MG.CFG (missing file is fine)
 loadcfg:
         xor a
         ld (ldrpath),a
@@ -4728,8 +4730,55 @@ draw_sep:
         pop af
         jp bput
 
+; title bar of the list not active (white with black text, frame kept) and
+; the key line dimmed while another window is shown: the editor, a box.
+; Only once (titin); draw_title (and helpline after it) make them active again.
+titoff:
+        ld a,(titin)
+        or a
+        ret nz
+        inc a
+        ld (titin),a
+        xor a
+        call bget
+        ld de,0x01FE
+        ld hl,0x0007
+        ld a,2
+        call rect
+        ld de,0x00FF
+        ld hl,0x0000
+        xor a
+        call rect
+        xor a
+        call bput
+        ld a,1
+        call bget
+        ld de,0x01FE
+        ld hl,0x0006
+        ld a,2
+        call rect
+        ld de,0x00FF
+        ld hl,0x0707
+        xor a
+        call rect
+        ld a,1
+        call bput
+        ld a,1                  ; the key line too: caps not inverted
+        ld (kinact),a
+        jp helpline
+
+; a box closed over the list: the title and key line active again, the list
+dlg_close:
+        call draw_title
+        call helpline
+        jp drawlist
+
 ; title bar: path on the left, number of items on the right, inverted
+; (also: the list has the focus again, the key line drawn after it is active)
 draw_title:
+        xor a
+        ld (titin),a
+        ld (kinact),a
         ; "N items"
         ld hl,(count)
         ld a,h
@@ -5511,6 +5560,7 @@ db_put: ld a,(dlg_b)
         jp bput
 
 dlg_all:
+        call titoff             ; the list window loses the focus
         xor a
 da_lp:  push af
         call dlg_band
@@ -5860,7 +5910,7 @@ dv_nos: djnz dv_bit
 ; ==========================================================================
 ;  Data
 ; ==========================================================================
-msg_nodos2:  dm "MB requires MSX-DOS2 (or Nextor)."
+msg_nodos2:  dm "MG requires MSX-DOS2 (or Nextor)."
              db 13,10,0x24
 msg_lowmem:  dm "Not enough memory (TPA) for MG."
              db 13,10,0x24
@@ -5878,7 +5928,7 @@ str_defarg:  dm "%F"
              db 0
 str_cfgext:  dm ".CFG"
              db 0
-str_cfgname: dm "MB.CFG"
+str_cfgname: dm "MG.CFG"
              db 0
 str_crlf:    db 13,10,0
 str_items:   dm " items"
@@ -6041,7 +6091,7 @@ msg_noedit:  dm "Cannot load the editor from MG.COM"
              db 0
 msg_inzip:   dm "Not inside a ZIP"
              db 0
-msg_self:    dm "MB.COM / MG.COM: not from here"
+msg_self:    dm "MG cannot run itself"
              db 0
 str_mged:    dm "MGED"
 msg_openerr: dm "Cannot open file"
@@ -6231,6 +6281,7 @@ kinact:      db 0
 edl_ent:     db 0
 rbatch:      db 0               ; 1 / 2: MG was started from MGRUN1 / MGRUN2.BAT
 hb_y:        db 0
+titin:       db 0               ; 1: the title bar is shown not active
 hb_x1:       db 0
 hb_p:        dw 0
 edl_fh:      db 0
@@ -6259,8 +6310,8 @@ zipdir:      equ zipdos+16          ; ZDIRMAX
 zhdr:        equ zipdir+ZDIRMAX     ; 48
 namebuf:     equ zhdr+48            ; 256
 zipbuf:      equ namebuf+256        ; ZBUFSZ
-tmpcfg:      equ zipbuf+ZBUFSZ      ; 64   TMPDIR from MB.CFG
-startcfg:    equ tmpcfg+64          ; 64   STARTDIR from MB.CFG
+tmpcfg:      equ zipbuf+ZBUFSZ      ; 64   TMPDIR from MG.CFG
+startcfg:    equ tmpcfg+64          ; 64   STARTDIR from MG.CFG
 tmpdir:      equ startcfg+64        ; 80   directory for extracted files
 tmpname:     equ tmpdir+80          ; 16
 tmppath:     equ tmpname+16         ; 112

@@ -806,33 +806,6 @@ ept_band:
         ld a,(ed_b)
         jp bput
 
-; title bar of the list: not active (white with black text, frame kept)
-titoff:
-        xor a
-        call bget
-        ld de,0x01FE
-        ld hl,0x0007
-        ld a,2
-        call rect
-        ld de,0x00FF
-        ld hl,0x0000
-        xor a
-        call rect
-        xor a
-        call bput
-        ld a,1
-        call bget
-        ld de,0x01FE
-        ld hl,0x0006
-        ld a,2
-        call rect
-        ld de,0x00FF
-        ld hl,0x0707
-        xor a
-        call rect
-        ld a,1
-        jp bput
-
 ; ---- keys ----------------------------------------------------------------------------
 ; a key, without dropping what was typed ahead
 ed_key: ld hl,(GETPNT)
